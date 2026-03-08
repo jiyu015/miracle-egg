@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -177,6 +178,7 @@ h1 { font-size: 22px; color: var(--dark); font-weight: 900; text-align: center; 
   <div class="stats">
     <div class="count-display">たたいた回数: <span id="count">0</span></div>
     <div class="prob-text">確率: 1/100,000,000</div>
+    <div class="prob-text" id="best-record" style="margin-top:4px;"></div>
   </div>
 </div>
 
@@ -189,9 +191,25 @@ h1 { font-size: 22px; color: var(--dark); font-weight: 900; text-align: center; 
 </div>
 
 <script>
-var count = 0;
+var count = parseInt(localStorage.getItem('eggCount') || '0');
 var crackCount = 0;
+var bestCount = parseInt(localStorage.getItem('eggBest') || '0');
 var PROB = 100000000;
+
+// 起動時に回数を復元
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('count').textContent = count.toLocaleString();
+  updateBestDisplay();
+});
+
+function updateBestDisplay() {
+  var el = document.getElementById('best-record');
+  if (bestCount > 0) {
+    el.textContent = '🍳 前回の記録: ' + bestCount.toLocaleString() + '回目で割れた';
+    el.style.color = '#e05050';
+    el.style.opacity = '1';
+  }
+}
 
 var crackPaths = [
   "M90,60 L80,85 L95,100",
@@ -206,6 +224,8 @@ var crackPaths = [
 function hitEgg(e) {
   count++;
   document.getElementById('count').textContent = count.toLocaleString();
+  localStorage.setItem('eggCount', count);
+  playTapSound();
 
   var wrap = document.getElementById('egg-wrap');
   wrap.classList.remove('shaking');
@@ -256,11 +276,15 @@ function triggerCrack() {
     path.setAttribute('stroke-linecap', 'round');
     document.getElementById('cracks').appendChild(path);
   }
+  playCrackSound();
   setTimeout(function() {
     launchConfetti();
     document.getElementById('explosion').classList.add('active');
     document.getElementById('crack-count-msg').textContent =
       count.toLocaleString() + '回目でついに…！';
+    bestCount = count;
+    localStorage.setItem('eggBest', bestCount);
+    localStorage.setItem('eggCount', '0');
   }, 300);
 }
 
@@ -291,12 +315,85 @@ function shareTwitter() {
 function restart() {
   count = 0;
   crackCount = 0;
+  localStorage.setItem('eggCount', '0');
   document.getElementById('count').textContent = '0';
   document.getElementById('cracks').innerHTML = '';
   document.getElementById('explosion').classList.remove('active');
+  updateBestDisplay();
 }
 
 
+// 音声生成
+var audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
+
+function playTapSound() {
+  try {
+    var ctx = getAudioCtx();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    // 少しランダムに音程を変えて単調にならないように
+    osc.frequency.setValueAtTime(600 + Math.random() * 200, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.08);
+    osc.type = 'sine';
+
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.1);
+  } catch(e) {}
+}
+
+function playCrackSound() {
+  try {
+    var ctx = getAudioCtx();
+    // 割れる音：ノイズっぽく
+    for (var i = 0; i < 3; i++) {
+      (function(i) {
+        setTimeout(function() {
+          var osc = ctx.createOscillator();
+          var gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.setValueAtTime(300 - i * 60, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.3);
+          osc.type = 'sawtooth';
+          gain.gain.setValueAtTime(0.15, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.3);
+        }, i * 80);
+      })(i);
+    }
+  } catch(e) {}
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 's' || e.key === 'S') { triggerCrack(); }
+});
 </script>
+<!-- アドフリくん広告 -->
+<div style="text-align:center;padding:8px 0;"><script type="text/javascript">
+  var _adf_global = {base: {}};
+  _adf_global.base.ad_id = "69ae08309055ea522f0650a2";
+  _adf_global.base.iframe_width = 320;
+  _adf_global.base.iframe_height = 50;
+  _adf_global.base.reload_span_sec = 30;
+  _adf_global.base.disable_reload = false;
+  _adf_global.base.iframe_style_cssText = "border:none;margin:0 auto;display:block;padding:0;";
+</script>
+<script type="text/javascript" src="//d1bqhgjuxdf1ml.cloudfront.net/js/adf_global_base_v1.2.min.js" charset="UTF-8"></script>
+</div>
 </body>
 </html>
